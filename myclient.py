@@ -1,81 +1,91 @@
 """
 myclient.py - Chat Client Implementation
 
-Usage:
-    python3 myclient.py <server_ip> <server_port>
-
 Description:
     1. The client connects to the server using the provided IP address and port.
     2. It prompts the user to enter a screen name, then sends a "register <screen_name>" command to the server.
        If the chosen screen name is already taken (the server sends an error message),
-       the user should enter a different name by using "register <screem_name>" command.
+       then user should enter a different name by using "register <screem_name>" command.
     3. Once registered, the client repeatedly requests input from the user. The entered text is sent to the server,
-       which processes it according to the defined protocol. The following commands are supported:
-       
-       Protocol Commands:
-         - register %user%
-             Register a new user with the specified screen name (e.g., "register Alice").
-         - send_all %msg%
-             Send a message to all connected users (e.g., "send_all Hello everyone").
-         - send_to %user% %msg%
-             Send a private message to a specific user (e.g., "send_to Bob How are you?").
-         - online_users
-             Get the list of all currently registered (connected) users.
-         - close_connection
-             Disconnect the current client from the server.
-    
+       which processes it according to the defined protocol.
     4. To disconnect, the user types "close_connection". The client then sends the "close_connection"
        command to the server and will remain running until it receives "Client exiting"
        from the server, or until it encounters a connection error (e.g., server forcibly closed).
 
 Testing:
     1. Start the server:
-           python3 myserver.py localhost <port>
+        - Example: "python3 myserver.py localhost 8090"
 
-       - Example: python3 myserver.py localhost 8090
-       - Expected:
-           Server has started
-           new client connected
-           ...
+        - Expected (Server Terminal): Server has started
     
     2. Start the client:
-           python3 myclient.py localhost <port>
+        2.1. OPEN THE FIRST CLIENT TERMINAL
+        - Example: "python3 myclient.py localhost 8090"
 
-       OPEN THE FIRST CLIENT TERMINAL
+        - Expected (Server Termianl): new client connected
+                                      1 active clients
+        - Expected (Client Terminal): Connected to server.
+                                      Enter your screen name: 
 
-       - Example: python3 myclient.py localhost 8090
-       - Expected: "Enter your screen name: "
-       You will be prompted to enter a screen name. Type one without spaces, e.g., "Alice".
+        2.2 ENTER THE FIRST SCREEN NAME
+        - Example: Enter your screen name: Carlos
 
-       OPEN THE SECOND CLIENT TERMINAL
+        - Expected (Server & Client Terminal): Carlos registered
 
-       - Example: python3 myclient.py localhost 8090
-       - Expected: "Enter your screen name: "
-       You will be prompted to enter a screen name. Type one without spaces, e.g., "Bob".
+        2.3 OPEN THE SECOND CLIENT TERMINAL
+        -Example: "python3 myclient.py localhost 8090"
+
+        - Expected (Server Termianl): new client connected
+                                      2 active clients
+        - Expected (Client Terminal): Connected to server.
+                                      Enter your screen name: 
+
+        2.4 ENTER THE SECOND SCREEN NAME (with existing name)
+        - Example: "Enter your screen name: Carlos"
+
+        - Expected (Client Terminal): Error: Username already exists
 
     3. Test the protocol in the following order to demonstrate all functionality:
-       a) "register <username>"
-          - Example: "register Alice"
-          - Expected: Both server and client terminal showing "Alice registered"
-          
-          If you successfully register a username in the second step, 3a can be skipped.
-          Otherwise, you cannot use command 3b to 3d, as the client terminal will show "not registered"
+        a) "register <username>" in the second client (unregistered) termianl
+            - Example: "register Bob"
 
-       b) "send_all <message>"
-          - Example: "send_all Hello everyone"
-          - Expected: All connected (registered) users see "message from Alice: Hello everyone".
+            - Expected (Server & Client Terminal): Bob registered
 
-       c) "online_users"
-          - Lists all users currently registered (including yourself).
+        b) "send_all <message>" in the first client (Carlos) terminal
+            - Example: "send_all Hello everyone"
 
-       d) "send_to <target_user> <message>"
-          - Example: "send_to Bob Hi Bob!"
-          - Expected: Only Bob receives "message from Alice: Hi Bob!".
+            - Expected (Carlos & Bob Client Terminal): message from Carlos: Hello everyone
+            - Expected (Server Terminal): [BROADCAST] Carlos => ALL: Hello everyone
+        
+        c) "send_to <target_user> <message>" in the second client (Bob) terminal
+            - Example: "send_to Carlos Good morning"
 
-       e) "close_connection"
-          - Gracefully disconnects from the server. The client should stop after receiving "Client exiting".
+            - Expected (Carlos Client Terminal): message from Bob: Good morning
+            - Expected (Server Terminal): [PRIVATE] Bob => Carlos: Good morning
 
-    4. You can also start multiple clients to test private messages ("send_to") and broadcast messages ("send_all").
+        d) "online_users" in the second client (Bob) terminal
+            - Example: "online_users"
+
+            - Expected (Bob Client Terminal): online users: Carlos, Bob
+
+        e) "close_connection" in the first client (Carlos) terminal
+            - Example: "close_connection"
+
+            - Expected (Carlos Client Terminal): Client exiting.
+            - Expected (Server Terminal): a client disconnected
+                                          1 active clients
+
+        f) "close_connection" in the second client (Bob) terminal
+            - Example: "close_connection"
+
+            - Expected (Bob Client Terminal): Client exiting.
+            - Expected (Server Terminal): a client disconnected
+                                          0 active clients
+        
+    4. Close the server
+        - Example: <Ctrl+C>
+        - Expected (Server Terminal): Server is stopping...
+                                      All client connections have been closed. Resources cleaned up.
 """
 import sys
 from ex2utils import Client
