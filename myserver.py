@@ -78,20 +78,17 @@ class MyServer(Server):
             
             # Check if username is empty
             if parameters == "":
-                self.printOutput("Error: Missing username for registration")
                 socket.send("Error: Missing username for registration".encode())
                 return True
 
             # Check if username contains space
             if " " in parameters:
-                self.printOutput("Error: Username cannot contain spaces")
                 socket.send("Error: Username cannot contain spaces".encode())
                 return True
             
             # Check if username is taken
             for client in self.clients:
                 if client.username == parameters:
-                    self.printOutput("Error: Username already exists")
                     socket.send("Error: Username already exists".encode())
                     return True
                     
