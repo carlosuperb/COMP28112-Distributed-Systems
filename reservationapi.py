@@ -36,6 +36,7 @@ class ReservationApi:
         self.retries  = retries
         self.delay    = delay
 
+
     def _reason(self, req: requests.Response) -> str:
         """Obtain the reason associated with a response"""
         reason = ''
@@ -65,45 +66,100 @@ class ReservationApi:
     def _headers(self) -> dict:
         """Create the authorization token header needed for API requests"""
         # Your code goes here
+        return {"Authorization": f"Bearer {self.token}"}
 
 
     def _send_request(self, method: str, endpoint: str) -> dict:
         """Send a request to the reservation API and convert errors to
            appropriate exceptions"""
         # Your code goes here
-
         # Allow for multiple retries if needed
+        for attempt in range(1, self.retries + 1):
             # Perform the request.
+            try:
+                response = requests.request(method, endpoint, headers=self._headers())
+            except Exception as e:
+                if attempt < self.retries:
+                    print(f"Attempt {attempt}/{self.retries}: Unable to connect to the server. Retrying...")
+                else:
+                    print("We are unable to process your request. Please try again later.")
+                time.sleep(self.delay)
+                continue
 
             # Delay before processing the response to avoid swamping server.
+            time.sleep(self.delay)
 
             # 200 response indicates all is well - send back the json data.
-
+            if response.status_code == 200:
+                return response.json()
+            
             # 5xx responses indicate a server-side error, show a warning
             # (including the try number).
+            elif 500 <= response.status_code <= 599:
+                if attempt < self.retries:
+                    print(f"Attempt {attempt}/{self.retries}: Server is currently unavailable. Retrying...")
+                else:
+                    print("We are unable to process your request due to server issues. Please try again later.")
+                time.sleep(self.delay)
+                continue
 
             # 400 errors are client problems that are meaningful, so convert
             # them to separate exceptions that can be caught and handled by
             # the caller.
-
+            elif 400 <= response.status_code < 500:
+                reason = self._reason(response)
+                # Bad request
+                if response.status_code == 400:
+                    raise BadRequestError(reason)
+                # The API token was invalid or missing
+                elif response.status_code == 401:
+                    raise InvalidTokenError(reason)
+                # SlotId does not exist
+                elif response.status_code == 403:
+                    raise BadSlotError(reason)
+                # The request has not been processed
+                elif response.status_code == 404:
+                    raise NotProcessedError(reason)
+                # Slot is not available
+                elif response.status_code == 409:
+                    raise SlotUnavailableError(reason)
+                # The client already holds the maximum number of reservations
+                elif response.status_code == 451:
+                    raise ReservationLimitError(reason)
+                # Unexpected status code
+                else:
+                    print("An error occurred with your request. Please try again.")
+                    raise HTTPError("Client error")
+                
             # Anything else is unexpected and may need to kill the client.
-
+            else:
+                print("An unexpected error occurred. Please try again later.")
+                raise HTTPError("Unexpected error")
+        
         # Get here and retries have been exhausted, throw an appropriate
         # exception.
+        raise NotProcessedError(f"Failed to process request after {self.retries} attempts.")
 
 
     def get_slots_available(self):
         """Obtain the list of slots currently available in the system"""
         # Your code goes here
+        return self._send_request("GET", f"{self.base_url}/reservation/available")
+
 
     def get_slots_held(self):
         """Obtain the list of slots currently held by the client"""
         # Your code goes here
+        return self._send_request("GET", f"{self.base_url}/reservation")
+
 
     def release_slot(self, slot_id):
         """Release a slot currently held by the client"""
         # Your code goes here
+        return self._send_request("DELETE", f"{self.base_url}/reservation/{slot_id}")
+
 
     def reserve_slot(self, slot_id):
         """Attempt to reserve a slot for the client"""
         # Your code goes here
+        return self._send_request("POST", f"{self.base_url}/reservation/{slot_id}")
