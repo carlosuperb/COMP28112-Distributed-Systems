@@ -21,7 +21,7 @@ from exceptions import (
     SlotUnavailableError,ReservationLimitError)
 
 class ReservationApi:
-    def __init__(self, base_url: str, token: str, retries: int, delay: float):
+    def __init__(self, base_url: str, token: str, retries: int, delay: float, cache_ttl: float):
         """ Create a new ReservationApi to communicate with a reservation
         server.
 
@@ -30,11 +30,17 @@ class ReservationApi:
             token: The user's API token obtained from the control panel.
             retries: The maximum number of attempts to make for each request.
             delay: A delay to apply to each request to prevent server overload.
+            cache_ttl: seconds the available-slot list stays valid in memory.
         """
         self.base_url = base_url
         self.token    = token
         self.retries  = retries
         self.delay    = delay
+
+        # cache for /reservation/available
+        self._slots_cache      = None
+        self._slots_cache_time = 0.0
+        self.cache_ttl         = cache_ttl
 
 
     def _reason(self, req: requests.Response) -> str:
@@ -69,7 +75,7 @@ class ReservationApi:
         return {"Authorization": f"Bearer {self.token}"}
 
 
-    def _send_request(self, method: str, endpoint: str) -> dict:
+    def _send_request(self, method: str, endpoint: str, service: str = "") -> dict:
         """Send a request to the reservation API and convert errors to
            appropriate exceptions"""
         # Your code goes here
@@ -80,7 +86,8 @@ class ReservationApi:
                 response = requests.request(method, endpoint, headers=self._headers())
             except Exception as e:
                 if attempt < self.retries:
-                    print(f"Attempt {attempt}/{self.retries}: Unable to connect to the server. Retrying...")
+                    prefix = f"[{service}] " if service else ""
+                    print(f"{prefix}Attempt {attempt}/{self.retries}: Unable to connect to the server. Retrying...")
                 else:
                     print("We are unable to process your request. Please try again later.")
                 time.sleep(self.delay)
@@ -96,11 +103,11 @@ class ReservationApi:
             # 5xx responses indicate a server-side error, show a warning
             # (including the try number).
             elif 500 <= response.status_code <= 599:
+                prefix = f"[{service}] " if service else ""
                 if attempt < self.retries:
-                    print(f"Attempt {attempt}/{self.retries}: Server is currently unavailable. Retrying...")
+                    print(f"{prefix}Attempt {attempt}/{self.retries}: Server is currently unavailable. Retrying...")
                 else:
                     print("We are unable to process your request due to server issues. Please try again later.")
-                time.sleep(self.delay)
                 continue
 
             # 400 errors are client problems that are meaningful, so convert
@@ -141,25 +148,60 @@ class ReservationApi:
         raise NotProcessedError(f"Failed to process request after {self.retries} attempts.")
 
 
-    def get_slots_available(self):
-        """Obtain the list of slots currently available in the system"""
+    def get_slots_available(self, service: str = ""):
+        """
+        Return cached slots if still fresh, 
+        otherwise query API for slots currently available in the system.
+        """
         # Your code goes here
-        return self._send_request("GET", f"{self.base_url}/reservation/available")
+        now = time.time()
+
+        # Serve cached data when it is still within the time‑to‑live window.
+        if self._slots_cache and now - self._slots_cache_time < self.cache_ttl:
+            return self._slots_cache
+        
+        # Cache expired (or empty), then query the API.
+        data = self._send_request("GET", f"{self.base_url}/reservation/available", service=service)
+
+        # Update the in‑memory cache.
+        self._slots_cache      = data
+        self._slots_cache_time = now
+        return data
 
 
-    def get_slots_held(self):
-        """Obtain the list of slots currently held by the client"""
+    def get_slots_held(self, service: str = ""):
+        """
+        Obtain the list of slots currently held by the client.
+        (No caching — always obtain the exact up‑to‑date list.)
+        """
         # Your code goes here
-        return self._send_request("GET", f"{self.base_url}/reservation")
+        return self._send_request("GET", f"{self.base_url}/reservation", service=service)
 
 
-    def release_slot(self, slot_id):
-        """Release a slot currently held by the client"""
+    def release_slot(self, slot_id, service: str = ""):
+        """
+        Release a slot that is currently held by the client, 
+        then invalidate the cached available‑slot list.
+        """
         # Your code goes here
-        return self._send_request("DELETE", f"{self.base_url}/reservation/{slot_id}")
+        data = self._send_request("DELETE", f"{self.base_url}/reservation/{slot_id}", service=service)
+
+        # Invalidate cache because availability has changed.
+        self._slots_cache = None
+        self._slots_cache_time = 0.0
+        return data
 
 
-    def reserve_slot(self, slot_id):
-        """Attempt to reserve a slot for the client"""
+    def reserve_slot(self, slot_id, service: str = ""):
+        """
+        Attempt to reserve the specified slot for the client, 
+        then invalidate the cached available‑slot list.
+        """
         # Your code goes here
-        return self._send_request("POST", f"{self.base_url}/reservation/{slot_id}")
+        data = self._send_request("POST", f"{self.base_url}/reservation/{slot_id}", service=service)
+
+        # Invalidate cache because availability has changed.
+        self._slots_cache = None
+        self._slots_cache_time = 0.0
+        return data
+
