@@ -74,16 +74,16 @@ You will see the menu displayed:
 | 0 | Exit the application |
 
 ## Testing
-Start the client with python3 booking.py.
-The application will automatically display current held slots.
-Use option 2 to view available slots.
-Use option 3 to book slots; test invalid IDs to trigger error handling.
-Use option 5 or 6 to test matching logic and automatic upgrades.
-Use option 7 to cancel redundant reservations.
-Confirm one request per second rate limit is respected.
+- Start the client with python3 booking.py.
+- The application will automatically display current held slots.
+- Use option 2 to view available slots.
+- Use option 3 to book slots; test invalid IDs to trigger error handling.
+- Use option 5 or 6 to test matching logic and automatic upgrades.
+- Use option 7 to cancel redundant reservations.
+- Confirm one request per second rate limit is respected.
 
 ## Notes
-Written in Python 3
-Uses requests and simplejson libraries
-Respects API usage rules (retry logic, one request per second)
-Follows coursework specification for COMP28112 Distributed Systems Exercise 3
+- Written in Python 3
+- Uses requests and simplejson libraries
+- Respects API usage rules (retry logic, one request per second)
+- Follows coursework specification for COMP28112 Distributed Systems Exercise 3
