@@ -54,6 +54,6 @@ telnet localhost 8090
 6. Test disconnection with close_connection and re-connection with a new username.
 
 ## Notes
-Written in Python 3.
-Uses the socket and threading libraries.
-Follows coursework specification for COMP28112 Distributed Systems Exercise 2.
+- Written in Python 3.
+- Uses the socket and threading libraries.
+- Follows coursework specification for COMP28112 Distributed Systems Exercise 2.
